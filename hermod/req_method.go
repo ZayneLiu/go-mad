@@ -48,3 +48,39 @@ func (c *Client) Delete(url string, opts ...func(*RequestConfig)) (*Response, er
 	}
 	return c.Request(cfg)
 }
+
+// Head sends a HEAD request.
+func (c *Client) Head(url string, opts ...func(*RequestConfig)) (*Response, error) {
+	cfg := RequestConfig{Method: http.MethodHead, URL: url}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return c.Request(cfg)
+}
+
+// Options sends an OPTIONS request.
+func (c *Client) Options(url string, opts ...func(*RequestConfig)) (*Response, error) {
+	cfg := RequestConfig{Method: http.MethodOptions, URL: url}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return c.Request(cfg)
+}
+
+// Connect sends a CONNECT request.
+func (c *Client) Connect(url string, opts ...func(*RequestConfig)) (*Response, error) {
+	cfg := RequestConfig{Method: http.MethodConnect, URL: url}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return c.Request(cfg)
+}
+
+// Trace sends a TRACE request.
+func (c *Client) Trace(url string, opts ...func(*RequestConfig)) (*Response, error) {
+	cfg := RequestConfig{Method: http.MethodTrace, URL: url}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	return c.Request(cfg)
+}
