@@ -84,20 +84,22 @@ func (f *FileHandle) JSONString() (string, error) {
 }
 
 func (f *FileHandle) Write(data any) error {
-	var b []byte
 	switch v := data.(type) {
 	case string:
-		b = []byte(v)
+		return os.WriteFile(f.path, []byte(v), 0644)
 	case []byte:
-		b = v
+		return os.WriteFile(f.path, v, 0644)
 	case io.Reader:
-		var err error
-		b, err = io.ReadAll(v)
+		file, err := os.OpenFile(f.path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
 			return err
 		}
+		defer file.Close()
+		_, err = io.Copy(file, v)
+		return err
+	default:
+		return fmt.Errorf("unsupported write type: %T", data)
 	}
-	return os.WriteFile(f.path, b, 0644)
 }
 
 // WriteText writes a string to the file
@@ -153,8 +155,8 @@ func (f *FileHandle) Move(dest string) error {
 	return os.Rename(f.path, dest)
 }
 
-// Reader returns an io.Reader for the file
-func (f *FileHandle) Reader() (io.Reader, error) {
+// Reader returns an io.ReadCloser for the file
+func (f *FileHandle) Reader() (io.ReadCloser, error) {
 	return os.Open(f.path)
 }
 
@@ -169,9 +171,15 @@ func (f *FileHandle) Bytes() (*bytes.Buffer, error) {
 
 // Hash returns SHA256 hash of file contents
 func (f *FileHandle) Hash() (string, error) {
-	data, err := f.Read()
+	file, err := os.Open(f.path)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", sha256.Sum256(data)), nil
+	defer file.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, file); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
