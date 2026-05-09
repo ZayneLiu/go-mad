@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"time"
 )
 
@@ -84,6 +85,13 @@ func (f *FileHandle) JSONString() (string, error) {
 }
 
 func (f *FileHandle) Write(data any) error {
+	if ok, err := f.Exists(); err != nil || !ok {
+		err := os.MkdirAll(path.Dir(f.path), 0755)
+		if err != nil {
+			return err
+		}
+	}
+
 	switch v := data.(type) {
 	case string:
 		return os.WriteFile(f.path, []byte(v), 0644)
