@@ -43,7 +43,7 @@ type Client struct {
 }
 
 // InterceptorFunc is a hook that can modify config/response or return an error.
-type InterceptorFunc[T any] func(T) (T, error)
+type InterceptorFunc[T any] func(T) error
 
 // Option configures a Client.
 type Option func(*Client)
@@ -103,12 +103,10 @@ func (c *Client) Request(config RequestConfig) (*Response, error) {
 	// 1. Apply request interceptors
 	cfg := config
 	for _, interceptor := range c.requestInterceptors {
-		result, err := interceptor(&cfg)
+		err := interceptor(&cfg)
 		if err != nil {
 			return nil, err
 		}
-
-		cfg = *result
 	}
 
 	// 2. Build URL
@@ -196,12 +194,10 @@ func (c *Client) Request(config RequestConfig) (*Response, error) {
 
 	// 9. Apply response interceptors
 	for _, interceptor := range c.responseInterceptors {
-		result, err := interceptor(r)
+		err := interceptor(r)
 		if err != nil {
 			return nil, err
 		}
-
-		r = result
 	}
 
 	return r, nil
