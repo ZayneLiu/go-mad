@@ -54,12 +54,9 @@ var DefaultClient = New()
 // New creates a new Axios client with optional base URL, timeout, etc.
 func New(opts ...Option) *Client {
 	c := &Client{
-		defaultHeaders: map[string]string{
-			// "Content-Type": "application/json",
-			// "Accept":       "application/json",
-		},
-		timeout:    30 * time.Second,
-		httpClient: &http.Client{},
+		defaultHeaders: map[string]string{},
+		timeout:        30 * time.Second,
+		httpClient:     &http.Client{},
 	}
 	for _, o := range opts {
 		o(c)
@@ -99,16 +96,6 @@ func WithHTTPClient(cl *http.Client) Option {
 	return func(c *Client) {
 		c.httpClient = cl
 	}
-}
-
-// AddRequestInterceptor adds a request interceptor.
-func (c *Client) AddRequestInterceptor(fn InterceptorFunc[*RequestConfig]) {
-	c.requestInterceptors = append(c.requestInterceptors, fn)
-}
-
-// AddResponseInterceptor adds a response interceptor.
-func (c *Client) AddResponseInterceptor(fn InterceptorFunc[*Response]) {
-	c.responseInterceptors = append(c.responseInterceptors, fn)
 }
 
 // Request performs a generic HTTP request.
