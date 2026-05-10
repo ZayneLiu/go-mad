@@ -40,6 +40,7 @@ type Client struct {
 	requestInterceptors  []InterceptorFunc[*RequestConfig]
 	responseInterceptors []InterceptorFunc[*Response]
 	httpClient           *http.Client
+	SkipURLParsing       bool // if true, skip URL parsing and just use the string as‑is
 }
 
 // InterceptorFunc is a hook that can modify config/response or return an error.
@@ -142,7 +143,12 @@ func (c *Client) Request(config RequestConfig) (*Response, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	req, err := http.NewRequestWithContext(ctx, cfg.Method, u.String(), bodyReader)
+
+	var url = u.String()
+	if c.SkipURLParsing {
+		url = cfg.URL
+	}
+	req, err := http.NewRequestWithContext(ctx, cfg.Method, url, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
