@@ -1,4 +1,4 @@
-// hermod is an HTTP client that provides an Axios‑style API
+// hermod is an HTTP client that provides an intuitive API
 package hermod
 
 import (
