@@ -94,26 +94,26 @@ func (f *FileHandle) JSON(v any) error {
 	return json.Unmarshal(data, v)
 }
 
-// JSONString is a convenience for getting JSON as a string
+// JSONString is a convenience for getting JSON as a string, optionally minified
 func (f *FileHandle) JSONString(minify bool) (string, error) {
-	var err error
-	text, err := f.Text()
+	data, err := f.Read()
 	if err != nil {
-		return "", fmt.Errorf("failed to read file as text: %w", err)
+		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	obj := (map[string]any{})
-	err = json.Unmarshal([]byte(text), &obj)
+	var obj any
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return "", fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
 
 	var jsonBytes []byte
 	if minify {
 		jsonBytes, err = json.Marshal(obj)
 	} else {
-
 		jsonBytes, err = json.MarshalIndent(obj, "", "  ")
 	}
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal JSON string: %w", err)
+		return "", fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
 	return string(jsonBytes), nil
@@ -193,10 +193,11 @@ func (f *FileHandle) Copy(dest string) error {
 	return err
 }
 
-// Move moves the file to a new location
+// Move moves the file to a new location and updates the handle path
 func (f *FileHandle) Move(dest string) error {
 	err := os.Rename(f.path, dest)
 	if err == nil {
+		f.path = dest
 		return nil
 	}
 
@@ -204,7 +205,11 @@ func (f *FileHandle) Move(dest string) error {
 	if err := f.Copy(dest); err != nil {
 		return err
 	}
-	return f.Delete()
+	if err := f.Delete(); err != nil {
+		return err
+	}
+	f.path = dest
+	return nil
 }
 
 // Reader returns an io.ReadCloser for the file
