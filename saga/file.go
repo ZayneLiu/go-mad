@@ -1,4 +1,4 @@
-// saga is a package that handle file I/O, archiving, and other operations related to managing files in a structured way.
+// saga is a package that handles file I/O, archiving, and other operations related to managing files in a structured way.
 // It provides utilities for reading, writing, and organizing files, as well as creating archives and handling file metadata
 package saga
 
@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"time"
 )
@@ -119,12 +118,10 @@ func (f *FileHandle) JSONString(minify bool) (string, error) {
 	return string(jsonBytes), nil
 }
 
+// Write writes data to the file, creating directories if they don't exist
 func (f *FileHandle) Write(data any) error {
-	if ok, err := f.Exists(); err != nil || !ok {
-		err := os.MkdirAll(path.Dir(f.path), 0755)
-		if err != nil {
-			return err
-		}
+	if err := os.MkdirAll(filepath.Dir(f.path), 0755); err != nil {
+		return err
 	}
 
 	switch v := data.(type) {
@@ -177,6 +174,10 @@ func (f *FileHandle) Delete() error {
 
 // Copy copies the file to a new location
 func (f *FileHandle) Copy(dest string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return err
+	}
+
 	src, err := os.Open(f.path)
 	if err != nil {
 		return err
@@ -195,6 +196,10 @@ func (f *FileHandle) Copy(dest string) error {
 
 // Move moves the file to a new location and updates the handle path
 func (f *FileHandle) Move(dest string) error {
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return err
+	}
+
 	err := os.Rename(f.path, dest)
 	if err == nil {
 		f.path = dest
