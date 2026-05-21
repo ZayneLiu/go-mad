@@ -28,7 +28,14 @@ func (f *FileHandle) Path() string {
 	return f.path
 }
 
-// Path returns the file path
+// File opens the file and returns an os.File handle
+//
+// The caller is responsible for closing the file when done
+func (f *FileHandle) File() (*os.File, error) {
+	return os.Open(f.path)
+}
+
+// Stat returns the FileInfo for the file
 func (f *FileHandle) Stat() (os.FileInfo, error) {
 	return os.Stat(f.path)
 }
