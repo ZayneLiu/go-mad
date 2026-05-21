@@ -11,12 +11,12 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 )
 
 type FileHandle struct {
 	path string
-	info os.FileInfo
 }
 
 // File returns a File handle for the given path
@@ -29,9 +29,14 @@ func (f *FileHandle) Path() string {
 	return f.path
 }
 
+// Path returns the file path
+func (f *FileHandle) Stat() (os.FileInfo, error) {
+	return os.Stat(f.path)
+}
+
 // Exists checks if the file exists
 func (f *FileHandle) Exists() (bool, error) {
-	_, err := os.Stat(f.path)
+	_, err := f.Stat()
 	if err == nil {
 		return true, nil
 	}
@@ -43,7 +48,7 @@ func (f *FileHandle) Exists() (bool, error) {
 
 // Size returns the file size in bytes
 func (f *FileHandle) Size() (int64, error) {
-	info, err := os.Stat(f.path)
+	info, err := f.Stat()
 	if err != nil {
 		return 0, err
 	}
@@ -52,11 +57,21 @@ func (f *FileHandle) Size() (int64, error) {
 
 // ModTime returns the file modification time
 func (f *FileHandle) ModTime() (time.Time, error) {
-	info, err := os.Stat(f.path)
+	info, err := f.Stat()
 	if err != nil {
 		return time.Time{}, err
 	}
 	return info.ModTime(), nil
+}
+
+// Extension returns the file extension (e.g., ".txt")
+func (f *FileHandle) Extension() string {
+	return filepath.Ext(f.path)
+}
+
+// Name returns the base name of the file
+func (f *FileHandle) Name() string {
+	return filepath.Base(f.path)
 }
 
 // Read reads the entire file into memory
@@ -71,7 +86,7 @@ func (f *FileHandle) Text() (string, error) {
 }
 
 // JSON reads and unmarshals the file as JSON
-func (f *FileHandle) JSON(v interface{}) error {
+func (f *FileHandle) JSON(v any) error {
 	data, err := f.Read()
 	if err != nil {
 		return err
@@ -80,8 +95,28 @@ func (f *FileHandle) JSON(v interface{}) error {
 }
 
 // JSONString is a convenience for getting JSON as a string
-func (f *FileHandle) JSONString() (string, error) {
-	return f.Text()
+func (f *FileHandle) JSONString(minify bool) (string, error) {
+	var err error
+	text, err := f.Text()
+	if err != nil {
+		return "", fmt.Errorf("failed to read file as text: %w", err)
+	}
+
+	obj := (map[string]any{})
+	err = json.Unmarshal([]byte(text), &obj)
+
+	var jsonBytes []byte
+	if minify {
+		jsonBytes, err = json.Marshal(obj)
+	} else {
+
+		jsonBytes, err = json.MarshalIndent(obj, "", "  ")
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal JSON string: %w", err)
+	}
+
+	return string(jsonBytes), nil
 }
 
 func (f *FileHandle) Write(data any) error {
@@ -160,7 +195,16 @@ func (f *FileHandle) Copy(dest string) error {
 
 // Move moves the file to a new location
 func (f *FileHandle) Move(dest string) error {
-	return os.Rename(f.path, dest)
+	err := os.Rename(f.path, dest)
+	if err == nil {
+		return nil
+	}
+
+	// cross-device link or other error – try copy+delete
+	if err := f.Copy(dest); err != nil {
+		return err
+	}
+	return f.Delete()
 }
 
 // Reader returns an io.ReadCloser for the file

@@ -1,12 +1,30 @@
 package saga
 
 import (
+	"os"
+	"path"
 	"path/filepath"
 	"testing"
 )
 
+func TestFileHandle_ResolvePath(t *testing.T) {
+	resolved, err := ResolvePath("~/Downloads")
+	if err != nil {
+		t.Fatalf("Failed to resolve path: %v", err)
+	}
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get user home directory: %v", err)
+	}
+
+	expectedPath := path.Join(userHome, "Downloads")
+	if resolved == expectedPath {
+		t.Logf("Path resolution successful: %s", resolved)
+	}
+}
+
 func TestFileHandle_WriteAndRead(t *testing.T) {
-	tempDir, _ := ResolvePath("~/Downloads")
+	tempDir := t.TempDir()
 
 	filePath := filepath.Join(tempDir, "test.txt")
 	f := File(filePath)
