@@ -70,8 +70,8 @@ err := file.WriteJSON(map[string]string{"key": "value"})
 // Write bytes
 err := file.Write([]byte("data"))
 
-// Write from reader
-err := file.Write(io.Reader)
+// Write from reader (io.Reader), e.g., from an HTTP response body
+err := file.Write(response.Body)
 ```
 
 **File Operations:**
