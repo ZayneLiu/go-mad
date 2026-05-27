@@ -19,6 +19,10 @@ type FileHandle struct {
 }
 
 // File returns a File handle for the given path
+//
+// The path should be resolved before creating the handle, saga provides a Resolve utility for this purpose.
+//
+// The handle does not perform any I/O until methods are called on it.
 func File(path string) *FileHandle {
 	return &FileHandle{path: path}
 }
@@ -32,12 +36,20 @@ func (f *FileHandle) Path() string {
 //
 // The caller is responsible for closing the file when done
 func (f *FileHandle) File() (*os.File, error) {
-	return os.Open(f.path)
+	file, err := os.Open(f.path)
+	if err != nil {
+		return nil, fmt.Errorf("open file %s: %w", f.path, err)
+	}
+	return file, nil
 }
 
 // Stat returns the FileInfo for the file
 func (f *FileHandle) Stat() (os.FileInfo, error) {
-	return os.Stat(f.path)
+	info, err := os.Stat(f.path)
+	if err != nil {
+		return nil, fmt.Errorf("stat file %s: %w", f.path, err)
+	}
+	return info, nil
 }
 
 // Exists checks if the file exists
@@ -82,7 +94,11 @@ func (f *FileHandle) Name() string {
 
 // Read reads the entire file into memory
 func (f *FileHandle) Read() ([]byte, error) {
-	return os.ReadFile(f.path)
+	data, err := os.ReadFile(f.path)
+	if err != nil {
+		return nil, fmt.Errorf("read file %s: %w", f.path, err)
+	}
+	return data, nil
 }
 
 // Text reads the file as a string
@@ -97,53 +113,40 @@ func (f *FileHandle) JSON(v any) error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(data, v)
-}
-
-// JSONString is a convenience for getting JSON as a string, optionally minified
-func (f *FileHandle) JSONString(minify bool) (string, error) {
-	data, err := f.Read()
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
+	if err := json.Unmarshal(data, v); err != nil {
+		return fmt.Errorf("unmarshal json from %s: %w", f.path, err)
 	}
-
-	var obj any
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return "", fmt.Errorf("failed to unmarshal JSON: %w", err)
-	}
-
-	var jsonBytes []byte
-	if minify {
-		jsonBytes, err = json.Marshal(obj)
-	} else {
-		jsonBytes, err = json.MarshalIndent(obj, "", "  ")
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-
-	return string(jsonBytes), nil
+	return nil
 }
 
 // Write writes data to the file, creating directories if they don't exist
 func (f *FileHandle) Write(data any) error {
 	if err := os.MkdirAll(filepath.Dir(f.path), 0755); err != nil {
-		return err
+		return fmt.Errorf("create directories for %s: %w", f.path, err)
 	}
 
 	switch v := data.(type) {
 	case string:
-		return os.WriteFile(f.path, []byte(v), 0644)
+		if err := os.WriteFile(f.path, []byte(v), 0644); err != nil {
+			return fmt.Errorf("write file %s: %w", f.path, err)
+		}
+		return nil
 	case []byte:
-		return os.WriteFile(f.path, v, 0644)
+		if err := os.WriteFile(f.path, v, 0644); err != nil {
+			return fmt.Errorf("write file %s: %w", f.path, err)
+		}
+		return nil
 	case io.Reader:
+		// Stream reader to disk to avoid holding the full payload in memory.
 		file, err := os.OpenFile(f.path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 		if err != nil {
-			return err
+			return fmt.Errorf("open file %s for writing: %w", f.path, err)
 		}
 		defer file.Close()
-		_, err = io.Copy(file, v)
-		return err
+		if _, err := io.Copy(file, v); err != nil {
+			return fmt.Errorf("write file %s from reader: %w", f.path, err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("unsupported write type: %T", data)
 	}
@@ -158,7 +161,7 @@ func (f *FileHandle) WriteText(text string) error {
 func (f *FileHandle) WriteJSON(v any) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("marshal json for %s: %w", f.path, err)
 	}
 	return f.Write(data)
 }
@@ -167,48 +170,54 @@ func (f *FileHandle) WriteJSON(v any) error {
 func (f *FileHandle) Append(data []byte) error {
 	file, err := os.OpenFile(f.path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("open file %s for append: %w", f.path, err)
 	}
 	defer file.Close()
-	_, err = file.Write(data)
-	return err
+	if _, err := file.Write(data); err != nil {
+		return fmt.Errorf("append to file %s: %w", f.path, err)
+	}
+	return nil
 }
 
 // Delete removes the file
 func (f *FileHandle) Delete() error {
-	return os.Remove(f.path)
+	if err := os.Remove(f.path); err != nil {
+		return fmt.Errorf("delete file %s: %w", f.path, err)
+	}
+	return nil
 }
 
 // Copy copies the file to a new location
 func (f *FileHandle) Copy(dest string) error {
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-		return err
+		return fmt.Errorf("create directories for %s: %w", dest, err)
 	}
 
 	src, err := os.Open(f.path)
 	if err != nil {
-		return err
+		return fmt.Errorf("open source %s: %w", f.path, err)
 	}
 	defer src.Close()
 
 	dst, err := os.Create(dest)
 	if err != nil {
-		return err
+		return fmt.Errorf("create destination %s: %w", dest, err)
 	}
 	defer dst.Close()
 
-	_, err = io.Copy(dst, src)
-	return err
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("copy %s to %s: %w", f.path, dest, err)
+	}
+	return nil
 }
 
 // Move moves the file to a new location and updates the handle path
 func (f *FileHandle) Move(dest string) error {
 	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-		return err
+		return fmt.Errorf("create directories for %s: %w", dest, err)
 	}
 
-	err := os.Rename(f.path, dest)
-	if err == nil {
+	if err := os.Rename(f.path, dest); err == nil {
 		f.path = dest
 		return nil
 	}
@@ -226,7 +235,11 @@ func (f *FileHandle) Move(dest string) error {
 
 // Reader returns an io.ReadCloser for the file
 func (f *FileHandle) Reader() (io.ReadCloser, error) {
-	return os.Open(f.path)
+	file, err := os.Open(f.path)
+	if err != nil {
+		return nil, fmt.Errorf("open file %s: %w", f.path, err)
+	}
+	return file, nil
 }
 
 // Bytes reads the file into a bytes.Buffer
@@ -242,13 +255,13 @@ func (f *FileHandle) Bytes() (*bytes.Buffer, error) {
 func (f *FileHandle) Hash() (string, error) {
 	file, err := os.Open(f.path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("open file %s: %w", f.path, err)
 	}
 	defer file.Close()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, file); err != nil {
-		return "", err
+		return "", fmt.Errorf("hash file %s: %w", f.path, err)
 	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }

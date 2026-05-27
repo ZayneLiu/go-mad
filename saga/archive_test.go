@@ -7,11 +7,12 @@ import (
 )
 
 func TestZipAndUnzip(t *testing.T) {
-	tempDir, _ := ResolvePath("~/Downloads")
+	tempDir := t.TempDir()
 
 	// Create source file
 	srcFile := filepath.Join(tempDir, "source.txt")
 	f := File(srcFile)
+
 	if err := f.WriteText("archive content"); err != nil {
 		t.Fatalf("Setup failed: %v", err)
 	}

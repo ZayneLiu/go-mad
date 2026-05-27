@@ -8,7 +8,7 @@ import (
 )
 
 func TestFileHandle_ResolvePath(t *testing.T) {
-	resolved, err := ResolvePath("~/Downloads")
+	resolved, err := Resolve("~/Downloads")
 	if err != nil {
 		t.Fatalf("Failed to resolve path: %v", err)
 	}
